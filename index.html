@@ -1,3 +1,10 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Task-Management GTD</title>
+
+<style>
 body {
   font-family: 'Segoe UI', sans-serif;
   margin: 0;
@@ -10,6 +17,7 @@ body {
   color: #e2e8f0;
 }
 
+/* HEADER */
 .header {
   display: flex;
   justify-content: space-between;
@@ -17,9 +25,10 @@ body {
   backdrop-filter: blur(10px);
   background: rgba(0, 119, 204, 0.9);
   color: white;
-  box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+  box-shadow: 0 5px 20px rgba(0,0,0,0.2);
 }
 
+/* BUTTONS */
 button {
   padding: 7px 12px;
   background: linear-gradient(135deg, #00cc88, #00e6a8);
@@ -28,54 +37,58 @@ button {
   cursor: pointer;
   color: #022c22;
   font-weight: bold;
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition: 0.2s;
 }
 
 button:hover {
   transform: translateY(-2px);
-  box-shadow: 0px 4px 10px rgba(0,0,0,0.2);
+  box-shadow: 0px 6px 15px rgba(0,0,0,0.25);
 }
 
+/* GRID */
 .grid {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: 140px;
+  grid-auto-columns: 150px;
   overflow-x: auto;
   height: 80vh;
   padding: 10px;
 }
 
+/* COLUMN */
 .column {
-  margin-right: 8px;
+  margin-right: 10px;
 }
 
+/* DAY HEADER */
 .day-header {
   font-size: 13px;
-  background: rgba(255,255,255,0.7);
-  backdrop-filter: blur(6px);
+  background: rgba(255,255,255,0.8);
+  backdrop-filter: blur(8px);
   border-radius: 10px;
   text-align: center;
   padding: 8px;
+  font-weight: bold;
+  margin-bottom: 10px;
   position: sticky;
   top: 0;
-  font-weight: bold;
-  margin-bottom: 8px;
 }
 
+/* TASK CARD */
 .task {
   background: white;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   padding: 10px;
   border-radius: 12px;
   font-size: 12px;
   cursor: grab;
-  box-shadow: 0 6px 12px rgba(0,0,0,0.1);
-  transition: transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.12);
+  transition: 0.15s;
 }
 
 .task:hover {
-  transform: scale(1.03);
-  box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+  transform: scale(1.04);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.2);
 }
 
 .task.low { border-left: 5px solid #22c55e; }
@@ -87,6 +100,7 @@ button:hover {
   background: #1e293b;
 }
 
+/* MODAL */
 .modal {
   position: fixed;
   top: 50%;
@@ -97,13 +111,212 @@ button:hover {
   display: none;
   width: 320px;
   border-radius: 15px;
-  box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+  box-shadow: 0 25px 60px rgba(0,0,0,0.4);
 }
 
 .modal input, .modal textarea, .modal select {
   width: 100%;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   padding: 6px;
   border-radius: 6px;
   border: 1px solid #ccc;
 }
+</style>
+</head>
+
+<body>
+
+<div class="header">
+  <div>
+    <button onclick="changeMonth(-1)">⬅</button>
+    <span id="monthText"></span>
+    <button onclick="changeMonth(1)">➡</button>
+  </div>
+
+  <div>
+    <button onclick="openModal()">+ Task</button>
+    <button onclick="toggleTheme()">Theme</button>
+  </div>
+</div>
+
+<div id="grid" class="grid"></div>
+
+<!-- MODAL -->
+<div class="modal" id="modal">
+  <h3>New Task</h3>
+
+  <input id="taskName" placeholder="Task name">
+  <input id="project" placeholder="Project">
+
+  <select id="priority">
+    <option>Low</option>
+    <option>Medium</option>
+    <option>High</option>
+    <option>Urgent</option>
+  </select>
+
+  <select id="status">
+    <option>To Do</option>
+    <option>In Progress</option>
+  </select>
+
+  <input type="date" id="date">
+
+  <textarea id="notes" maxlength="3000" placeholder="Notes"></textarea>
+  <textarea id="subtasks" placeholder="Subtasks (one per line)"></textarea>
+
+  <button onclick="addTask()">Save</button>
+  <button onclick="closeModal()">Cancel</button>
+</div>
+
+<script>
+let current = new Date();
+let data = JSON.parse(localStorage.getItem("tasks") || "{}");
+
+function save() {
+  localStorage.setItem("tasks", JSON.stringify(data));
+}
+
+function render() {
+  const grid = document.getElementById("grid");
+  grid.innerHTML = "";
+
+  let year = current.getFullYear();
+  let month = current.getMonth();
+  let days = new Date(year, month + 1, 0).getDate();
+
+  document.getElementById("monthText").textContent =
+    current.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  for (let d = 1; d <= days; d++) {
+    let col = document.createElement("div");
+    col.className = "column";
+
+    let date = new Date(year, month, d);
+
+    let header = document.createElement("div");
+    header.className = "day-header";
+    header.innerText =
+      date.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' });
+
+    col.appendChild(header);
+
+    let tasks = data[d] || [];
+    tasks.forEach((t, i) => col.appendChild(renderTask(t, d, i)));
+
+    col.ondragover = e => e.preventDefault();
+    col.ondrop = e => dropTask(e, d);
+
+    grid.appendChild(col);
+  }
+
+  let next = document.createElement("div");
+  next.className = "column";
+  next.innerHTML = "<div class='day-header'>Next Month</div>";
+
+  (data["next"] || []).forEach((t,i) => next.appendChild(renderTask(t, "next", i)));
+
+  next.ondragover = e => e.preventDefault();
+  next.ondrop = e => dropTask(e, "next");
+
+  grid.appendChild(next);
+}
+
+function renderTask(t, day, index) {
+  let div = document.createElement("div");
+  div.className = "task " + t.priority.toLowerCase();
+  div.draggable = true;
+
+  div.innerHTML = `
+    <div style="font-weight:bold;">${t.name}</div>
+    <div style="font-size:10px; opacity:0.7;">${t.project || ""}</div>
+    <div style="display:flex; justify-content:space-between; margin-top:5px;">
+      <span>${t.status}</span>
+      <span>${t.priority}</span>
+    </div>
+  `;
+
+  div.ondragstart = e => {
+    e.dataTransfer.setData("text", JSON.stringify({day, index}));
+  };
+
+  div.onclick = () => {
+    if (confirm("Delete task?")) {
+      data[day].splice(index, 1);
+      save();
+      render();
+    }
+  };
+
+  return div;
+}
+
+function dropTask(e, newDay) {
+  let { day, index } = JSON.parse(e.dataTransfer.getData("text"));
+
+  let [task] = data[day].splice(index, 1);
+
+  data[newDay] = data[newDay] || [];
+  data[newDay].push(task);
+
+  save();
+  render();
+}
+
+function addTask() {
+  let dateVal = date.value;
+  if (!dateVal) return alert("Choose a date");
+
+  let day = new Date(dateVal).getDate();
+
+  let t = {
+    name: taskName.value,
+    project: project.value,
+    priority: priority.value,
+    status: status.value,
+    notes: notes.value,
+    subtasks: subtasks.value
+  };
+
+  data[day] = data[day] || [];
+  data[day].push(t);
+
+  save();
+  closeModal();
+  render();
+}
+
+function openModal() {
+  modal.style.display = "block";
+}
+
+function closeModal() {
+  modal.style.display = "none";
+}
+
+function changeMonth(n) {
+  current.setMonth(current.getMonth() + n);
+
+  if (n === 1 && data["next"]) {
+    data["next"].forEach(t => {
+      let d = 1;
+      data[d] = data[d] || [];
+      data[d].push(t);
+    });
+    data["next"] = [];
+    save();
+  }
+
+  render();
+}
+
+function toggleTheme() {
+  document.body.classList.toggle("dark");
+}
+
+render();
+</script>
+
+</body>
+</html>
+``
